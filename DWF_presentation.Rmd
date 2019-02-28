@@ -1,0 +1,638 @@
+---
+title: "Dutch word formation"
+subtitle: "Non-linguistic perspective"
+author: "Jacek Pardyak"
+date: "21 februari 2019"
+output: slidy_presentation
+toc: true
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Outline
+
+- Motivation,
+
+- Dutch word formation - linguistic perspective,
+
+- Graph theory,
+
+- Relation of letter alternation,
+
+- Alternation graph properties,
+
+- Exercises,
+
+- Shiny application.
+
+## Motivation
+
+To communicate you need to learn vocabulary (list of words) and grammar (art of picking and ordering words from vocabulary). Then you can:
+
+- receive messages and process them (listen and read),
+
+- process thoughts and send expressing them messages (write and speak).
+
+Second-language learners of Dutch struggle with phenomena like:
+
+1. kannen - kunnen - kennen - kinnen
+
+2. braken - breken - broeken - breuken
+
+3. morgen - zorgen - worgen - borgen 
+
+## Questions
+
+- How to identify slightly differing words?
+
+- What are central (the most similar to other) Dutch words? 
+
+- How far we can get sequentially altering one letter in a chosen word? And further:
+
+1. From which word to start to pass maximal number of words? 
+
+2. How to decide which word to choose next?
+
+- What is the minimal number of sequential alternations after which we come back to the same word?
+
+- How to find non-words which look and sound like Dutch words?
+
+
+## Dutch word formation through the eyes of a linguist
+
+The major word formation processes in Dutch are :
+
+1. compounding e.g.: 
+
+- oude-mannen-huis,
+
+- zak-geld & geld-zak,
+
+- arbeids-ongeschiktheids-verzekerings-maatschappij.
+
+2. derivation (affixation and alternation) e.g.:
+
+- woon-t | ge-woon-d | on-ge-woon | won-en,
+
+- Amsterdam-se | Amsterdam-mer | Amsterdam-mers | Amsterdam-mertje,
+
+- sluit-en | sloot | slot | sleut-el.
+
+We focus further only on alternation, regardless of vowel or consonant.
+
+## Definitions
+
+A **graph** (aka network) is a mathematical structure used to model pairwise relations between objects.
+
+Graph is made up of **vertices** (aka nodes or points) which are connected by **edges** (aka arcs, links or lines).
+
+Edges are defined by a **relation** between vertices, e.g. LinkedIn connection, people acquaintance, film co-starring, nominations etc.
+
+**Relation of alternation**: two words *x* and *y* are related ( *x ~ y* ) iff they differ by exactly one letter.
+
+This relation is:
+
+- **not** reflexive (*x ~ x*),
+
+- symmetric (if *x ~ y* then *y ~ x* ), 
+
+- **not** transitive (if *x ~ y* and *y ~ z* then *x ~ z*).
+
+Thus this is **not** an equivalence relation.
+
+
+## Definitions
+
+
+Indicators of **centrality** identify the most important vertices within a graph. 
+
+**Degree centrality** is defined as the number of edges incident upon a vertex.
+
+**Closeness centrality** average length of the shortest path between a vertex and all other vertices in the graph. 
+
+**Betweenness centrality** quantifies the number of times a vertex acts as a bridge along the shortest path between two other vertices.
+
+A graph **diameter** is the longest geodesic distance (length of the shortest path between two vertices) in the graph.
+
+**Farthest vertices** are vertices which are connected by the diameter path.
+
+Graph **clique** is a complete (each pair of graph vertices is connected by an edge) sub graph.
+
+**Largest clique** is a clique for which there is no other clique including more vertices.
+
+**Circle** is a path such that the first node of the path corresponds to the last.
+
+**Shortest circle** is a circle or which there is no other circle including less vertices.
+
+## Definitions
+
+- Graph is **connected** when each vertex is reachable from any other vertex.
+
+- **Pseudoword** (aka non-word) is a unit of speech or text that appears to be an actual word in a certain language, while in fact it has no meaning in the lexicon (vocabulary).
+
+
+
+
+```{r}
+
+# non-trivial
+
+```
+
+## Data preparation
+
+1. Data comes from: [www.opentaal.org](www.opentaal.org). We use all "basic-approved", "basic-unapproved" and "inflected" datasets.
+
+2. Proper names (abbreviations, geographical names, first names, nationality names, etc.) are written with small letters.
+
+```{r}
+klanken <- data.frame(
+  matrix(data = c(
+    "au", "A",
+    "ei", "B",
+    "eu", "C", 
+    "ie", "D",
+    "ij", "E",
+    "oe", "F", 
+    "ou", "G",
+    "ui", "H"
+  ), nrow = 8, byrow = T))
+```
+
+3. Pairs from the list (Tweetekenklanken): 
+
+**`r paste(klanken$X1, collapse = ', ')`**
+
+are treated as an one letter.
+
+4. Alternation relation is established thanks to the *base::agrep* function:
+
+```{r, echo=TRUE, eval=FALSE}
+agrep(pattern = word, x = words, value = T,
+                 max.distance = list(
+                   insertions = 0,
+                   deletions = 0,
+                   substitutions = 1,
+                   cost = 1), useBytes = TRUE)
+```
+
+
+## Graph construction and visualization
+
+
+5. Graph is constructed with *igraph::graph_from_data_frame* function:
+
+```{r, echo=TRUE, eval=FALSE}
+graph_from_data_frame(d = data_out,
+                      directed = FALSE,
+                      vertices = NULL)
+```
+
+6. Interactive graph visualizations made with  *visNetwork::visNetwork* function:
+
+```{r, echo=TRUE, eval=FALSE}
+visNetwork(nodes = graph$nodes,
+           edges = graph$edges)
+```
+
+
+7. Other interactive visualizations made with *plotly::plot_ly* function:
+
+```{r, echo=TRUE, eval=FALSE}
+plot_ly(x = deg,
+        type = "histogram",
+        histnorm = "probability")
+```
+
+8. Dashboard is produces with *shiny* and *shinydashboard* libraries.
+
+## Example of alternation subgraph
+
+```{r}
+words <- c("Dank", "je", "wel", "voor", "de", "mooie", "dag")
+```
+
+
+Words in the sentence: **`r paste(words, collapse = " ")`** form sub graph: 
+
+
+```{r, warning=FALSE, message=FALSE}
+library(visNetwork)
+library(igraph)
+load("./DWF_data.RData")
+words <- tolower(words)
+
+neighbors <- c()
+for(word in words){
+  x <- match(word, V(net)$name)
+  y <- neighborhood(graph = net, nodes = x)[[1]]  
+  neighbors <- c(neighbors, y)
+}
+
+subNet <- induced_subgraph(graph = net,
+                           vids = neighbors,
+                           impl =  "copy_and_delete" )
+subNet <- toVisNetworkData(igraph = subNet, idToLabel = TRUE)
+
+visNetwork(nodes = subNet$nodes,
+           edges = subNet$edges) %>%
+  visPhysics(solver = "repulsion") 
+```
+
+
+## Alternation graph vertices
+
+```{r, echo=FALSE, message=FALSE}
+V(net)
+```
+
+## Alternation graph edges 
+
+```{r}
+E(net)
+```
+
+
+## Alternation graph degree centrality
+
+Vertices with the highest degree:
+
+```{r}
+deg <- degree(net, mode="all")
+deg <- deg[order(deg, decreasing = T)]
+head(deg)
+```
+
+
+Vertices with the lowest degree:
+
+```{r}
+tail(deg)
+```
+
+
+## The 'mans' word neighborhood (highest degree vertex)
+
+```{r, warning=FALSE}
+library(visNetwork)
+
+word <- names(deg[1]) # c("à")
+node <- match(word, V(net)$name)
+neighbors <- neighborhood(graph = net, nodes = node)[[1]]
+subNet <- induced_subgraph(graph = net,
+                           vids = neighbors,
+                           impl =  "copy_and_delete" )
+subNet <- toVisNetworkData(igraph = subNet, idToLabel = TRUE)
+
+visNetwork(nodes = subNet$nodes,
+           edges = subNet$edges) %>%
+  visPhysics(solver = "repulsion") 
+```
+
+
+
+
+## Relative frequency of vertex degree
+
+```{r, message=FALSE}
+library(plotly)
+p <- plot_ly(x = deg,
+             type = "histogram",
+             histnorm = "probability")  %>%
+  layout(xaxis = list(title = "Vertex degree"),
+         yaxis = list(title = "Relative frequency"))
+p
+```
+
+## Dependency between vertex degree and vertex length
+
+```{r, warning=FALSE, message=FALSE}
+df <- data.frame(V1 = names(deg), 
+                 V2 = deg,
+                 V3 = nchar(names(deg)))
+df$V1 <- NULL
+
+df <- df[!duplicated(df),]
+
+p <- plot_ly(data = df, x = ~V2, y = ~V3)  %>%
+  layout(xaxis = list(title = "Vertex degree"),
+         yaxis = list(title = "Vertex length"))
+p
+```
+
+
+## Dependency between vertex degree, length and frequency of occurrence 
+
+```{r, message=FALSE}
+library(plotly)
+df <- data.frame(V1 = names(deg), 
+                 V2 = deg,
+                 V3 = nchar(names(deg)))
+m <- with(df, table(V2, V3))
+m <- data.frame(m)  
+m$V2 <- as.numeric(as.character(m$V2)) 
+m$V3 <- as.numeric(as.character(m$V3)) 
+
+mNew <- data.frame()
+for (i in 0:max(m$V2)) {
+  for(j in 0: max(m$V3)){
+    row <- c(i,j)
+    mNew <- rbind(mNew,row)    
+  }
+}
+names(mNew) <- c("V2", "V3")
+m <- merge(mNew, m, all.x = T)
+m[is.na(m$Freq), "Freq"] <- 0
+m <- reshape2::dcast(m, V2 ~ V3) 
+m$V2 <- NULL
+m <- as.matrix(m)
+m <- t(m)
+p <- plot_ly(z = m, type = "heatmap") %>%
+  layout(xaxis = list(title = "Vertex degree"),
+         yaxis = list(title = "Vertex length "),
+         annotations = list(yref='paper', xref="paper", y=1.05, x=1.1,
+                            text="Frequency", showarrow=F, text = "legendtitle"))
+p
+```
+
+## Dependency between vertex degree, length and logarithmized frequency 
+
+```{r, message=FALSE}
+m <- log10(m+1)
+
+p <- plot_ly(z = m, type = "heatmap") %>%
+  layout(xaxis = list(title = "Vertex degree"),
+         yaxis = list(title = "Vertex length"),
+         annotations = list(yref='paper', xref="paper", y=1.05, x=1.1,
+                            text="Log - frequency", showarrow=F, text = "legendtitle") )
+p
+```
+
+
+
+## Excercise 1 
+
+Is that possible to put more dots on the red line?
+
+```{r, warning=FALSE, message=FALSE}
+df <- data.frame(V1 = names(deg), 
+                 V2 = deg,
+                 V3 = nchar(names(deg)))
+df$V1 <- NULL
+
+df <- df[!duplicated(df),]
+
+p <- plot_ly(data = df, x = ~V2, y = ~V3)  %>%
+  layout(xaxis = list(title = "Vertex degree"),
+         yaxis = list(title = "Vertex length"),
+         shapes = list(type = "rect",
+                    fillcolor = "red", line = list(color = "red"), opacity = 0.3,
+                    x0 = 0, x1 = 46, xref = "x",
+                    y0 = 1, y1 = 1, yref = "y"))
+p 
+```
+
+
+## Excercise 1 - solution
+
+**No.** One-letter words form polygon. All the vertices are connected together with sides and diagonals. Each vertex degree is the same.
+
+
+```{r, warning=FALSE, message=FALSE}
+
+
+p <- plot_ly(data = df, x = ~V2, y = ~V3)  %>%
+  layout(xaxis = list(title = "Vertex degree"),
+         yaxis = list(title = "Vertex length"),
+         shapes = list(type = "rect",
+                    fillcolor = "red", line = list(color = "red"), opacity = 0.3,
+                    x0 = 0, x1 = 46, xref = "x",
+                    y0 = 1, y1 = 1, yref = "y"))
+p 
+```
+
+
+## Alternation graph closeness centrality
+
+Vertices with the highest closeness:
+
+```{r, message=FALSE, warning=FALSE}
+clo <- closeness(net, mode="all")
+clo <- clo[order(clo, decreasing = T)]
+head(clo)
+```
+
+Vertices with the lowest closeness:
+
+```{r}
+tail(clo)
+```
+
+
+## The 'belten' word neighborhood (highest closeness vertex)
+
+```{r, warning=FALSE}
+library(visNetwork)
+# find further neighbors
+word <- names(head(clo, 1))
+node <- match(word, V(net)$name)
+
+neighbors <- neighborhood(graph = net, nodes = node)[[1]]
+subNet <- induced_subgraph(graph = net,
+                           vids = neighbors,
+                           impl =  "copy_and_delete" )
+subNet <- toVisNetworkData(igraph = subNet, idToLabel = TRUE)
+
+visNetwork(nodes = subNet$nodes,
+           edges = subNet$edges) %>%
+  visPhysics(solver = "repulsion") 
+```
+
+
+
+## Alternation graph betweenness closeness
+
+Vertices with the highest betweenness:
+
+```{r, message=FALSE, warning=FALSE}
+bet <- betweenness(net, normalized = FALSE)
+bet <- bet[order(bet, decreasing = T)]
+head(bet)
+```
+
+Vertices with the lowest betweenness:
+
+```{r}
+tail(bet)
+```
+
+
+## The 'booten' word neighborhood (highest betweenness vertex)
+
+```{r, warning=FALSE}
+library(visNetwork)
+# find further neighbors
+word <- names(head(bet, 1))
+node <- match(word, V(net)$name)
+
+neighbors <- neighborhood(graph = net, nodes = node)[[1]]
+subNet <- induced_subgraph(graph = net,
+                           vids = neighbors,
+                           impl =  "copy_and_delete" )
+subNet <- toVisNetworkData(igraph = subNet, idToLabel = TRUE)
+
+visNetwork(nodes = subNet$nodes,
+           edges = subNet$edges) %>%
+  visPhysics(solver = "repulsion") 
+```
+
+
+
+## Excercise 2
+
+What is wrong with the 'booten' - graph and how to fix it?
+
+```{r, warning=FALSE}
+visNetwork(nodes = subNet$nodes,
+           edges = subNet$edges) %>%
+  visPhysics(solver = "repulsion") 
+```
+
+
+
+## Excercise 2 - solution
+
+```{r}
+library(visNetwork)
+# find further neighbors
+word <- names(head(bet, 1))
+node <- match(word, V(net)$name)
+
+neighbors <- neighborhood(graph = net, nodes = node)[[1]]
+subNet <- induced_subgraph(graph = net,
+                           vids = neighbors,
+                           impl =  "copy_and_delete" )
+newWord <- c("blotee", "boonee", "blonen")
+subNet <- subNet + vertices(newWord)
+
+subNet <- subNet + edges(match(newWord[1], V(subNet)$name),
+                        match("bloten", V(subNet)$name),
+                        match(newWord[1], V(subNet)$name),
+                        match("bootee", V(subNet)$name),
+                        match(newWord[2], V(subNet)$name),
+                        match("boonen", V(subNet)$name),
+                        match(newWord[2], V(subNet)$name),
+                        match("bootee", V(subNet)$name),
+                        match(newWord[3], V(subNet)$name),
+                        match("boonen", V(subNet)$name),
+                        match(newWord[3], V(subNet)$name),
+                        match("bloten", V(subNet)$name))
+
+#subNet <- subNet + edge(match(newWord[1], V(subNet)$name),
+#                        match("bootee", V(subNet)$name))
+
+subNet <- toVisNetworkData(igraph = subNet, idToLabel = TRUE)
+node <- match(newWord, subNet$nodes[,"label"])
+subNet$nodes[node,"color"] <- "red"
+
+visNetwork(nodes = subNet$nodes,
+           edges = subNet$edges) %>%
+  visPhysics(solver = "repulsion") 
+```
+
+
+## The farthest alternation graph vertices
+
+```{r}
+farVert <- farthest_vertices(net)
+```
+
+The farthest vertices are **`r names(farVert$vertices[[1]])`** and **`r names(farVert$vertices[[2]])`**. Their distance is equal to: **`r farVert$distance[[1]]`**
+
+The shortest path between the farthest vertices:
+
+```{r}
+farPath <- shortest_paths(graph = net,
+                 from = farVert$vertices[[1]],
+                 to = farVert$vertices[[2]])
+
+farMat <- get.vertex.attribute(net, "name")[farPath$vpath[[1]]]
+farMat <- c(farMat, rep(" ", times = 5))
+
+farMat <- matrix(data = farMat, ncol = 7, byrow = TRUE)
+
+knitr::kable(farMat)
+```
+
+
+
+
+## The shortest path between the farthest vertices
+
+
+```{r}
+
+subNet <- induced_subgraph(graph = net,
+                              vids = farPath$vpath[[1]],
+                              impl =  'create_from_scratch' )
+subNet <- toVisNetworkData(igraph = subNet, idToLabel = TRUE)
+
+visNetwork(nodes = subNet$nodes,
+           edges = subNet$edges) %>%
+  visPhysics(solver = "repulsion") 
+```
+
+
+## The largest alternation graph clique
+
+
+```{r, message=FALSE, warning=FALSE}
+cli <- largest_cliques(net)[[1]]
+vid <- as.integer(cli) 
+
+subNet <- induced_subgraph(graph = net,
+                           vids = vid,
+                           impl =  "copy_and_delete" )
+subNet <- toVisNetworkData(igraph = subNet, idToLabel = TRUE)
+
+visNetwork(nodes = subNet$nodes,
+           edges = subNet$edges) %>%
+  visPhysics(solver = "repulsion") 
+```
+
+
+## The shortest alternation graph circle
+
+```{r}
+gir <- girth(net, circle = TRUE)$circle
+vid <- as.integer(gir)
+subNet <- induced_subgraph(graph = net,
+                           vids = vid,
+                           impl =  "copy_and_delete" )
+subNet <- toVisNetworkData(igraph = subNet, idToLabel = TRUE)
+
+visNetwork(nodes = subNet$nodes,
+           edges = subNet$edges) %>%
+  visPhysics(solver = "repulsion") 
+
+```
+
+
+## Excercise 3
+
+Use my Shiny App to pick alternation graph vertex and display its neighbourhood.
+
+
+```{r, out.width = "750px", fig.align="center"}
+knitr::include_graphics("DWF_app_capture.PNG")
+```
+
+## References
+
+- Network analysis with R and igraph: NetSci X Tutorial <a href="http://kateto.net/networks-r-igraph" target="_blank">http://kateto.net/networks-r-igraph</a>
+
+- All sources of this presentation: <a href="https://github.com/JacekPardyak/DWF/" target="_blank">https://github.com/JacekPardyak/DWF/</a>
+
